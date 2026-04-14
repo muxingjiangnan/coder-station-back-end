@@ -53,12 +53,41 @@ async function updateCollection(modelName, fields) {
   for (let i = 0; i < documents.length; i++) {
     const doc = documents[i];
 
-    // 更新每个字段
-    fields.forEach(field => {
-      if (doc[field] !== undefined) {
-        doc[field] = generateRandomTimestamp();
+    if (modelName === 'commentModel') {
+      // 特殊处理评论：commentDate 必须比评论对象的时间戳晚至少1分钟
+      let objectDate = null;
+      if (doc.issueId) {
+        const Issue = mongoose.model('issueModel');
+        const issue = await Issue.findById(doc.issueId);
+        if (issue && issue.issueDate) {
+          objectDate = parseInt(issue.issueDate);
+        }
       }
-    });
+      if (!objectDate && doc.bookId) {
+        const Book = mongoose.model('bookModel');
+        const book = await Book.findById(doc.bookId);
+        if (book && book.onShelfDate) {
+          objectDate = parseInt(book.onShelfDate);
+        }
+      }
+      if (objectDate) {
+        const minCommentTime = objectDate + 60000; // 至少晚1分钟
+        const endTime = new Date('2026-04-10T23:59:59.999Z').getTime();
+        const maxCommentTime = Math.max(minCommentTime, endTime);
+        const randomTime = Math.floor(Math.random() * (maxCommentTime - minCommentTime + 1)) + minCommentTime;
+        doc.commentDate = randomTime.toString();
+      } else {
+        // 如果找不到对象，使用普通随机
+        doc.commentDate = generateRandomTimestamp();
+      }
+    } else {
+      // 普通更新
+      fields.forEach(field => {
+        if (doc[field] !== undefined) {
+          doc[field] = generateRandomTimestamp();
+        }
+      });
+    }
 
     await doc.save();
 
